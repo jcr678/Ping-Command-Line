@@ -7,26 +7,77 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <array>
+#include <sstream>
+#include <string>
+#include <iostream>
 using namespace std;
-#define PORT_NO 0
 map<int, string> getMap(int argc, char* argv[]);
 
-char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con)
+void
+write_data (FILE * stream)
 {
-    //just use nslookup, for example
-    //  nslookup google.com  | tail -n 2
+  int i;
+  for (i = 0; i < 100; i++)
+    fprintf (stream, "%d\n", i);
+  if (ferror (stream))
+    {
+      fprintf (stderr, "Output to stream failed.\n");
+      exit (1);
+    }
+}
+string dns_lookup(const char *address)
+{    std::stringstream ss;
+     ss << "dig +short " << address;
+     //use popen
+    char buffer[128];
+    std::string result = "";
+    FILE* pipe = popen(ss.str().c_str(), "r");
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    try {
+        while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+            result += buffer;
+        }
+    } catch (...) {
+        pclose(pipe);
+        throw;
+    }
+    pclose(pipe);
+     result.erase(std::remove(result.begin(), result.end(), '\n'), result.end());
+     return result;
 
 }
-char reverse_lookup(){
-  //host dns_lookup
-  //like host 172.217.27.206
-  
-  //dig -x 172.217.27.206 +short
+string reverse_dns_lookup(const char *address){
+  std::stringstream ss;
+  ss << "dig -x " << address<< " +short";
+  //cout << ss.str() << endl;
+  char buffer[128];
+  std::string result = "";
+  FILE* pipe = popen(ss.str().c_str(), "r");
+  if (!pipe) throw std::runtime_error("popen() failed!");
+  try {
+      while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+          result += buffer;
+      }
+  } catch (...) {
+      pclose(pipe);
+      throw;
+  }
+  pclose(pipe);
+  //only get first returned value, if we need more just return result.
+  stringstream ssin(result);
+  ssin >> result;
+  return result;
 }
 int main(int argc, char* argv[]){
-  struct sockaddr_in addr_con;
-  char *ip_addr;
-  ip_addr = dns_lookup(argv[1], &addr_con);
-  cout <<  ip_addr << endl;
+  string dns = dns_lookup(argv[1]);
+  cout  << dns  << endl;
+  string rev_dns = reverse_dns_lookup(dns.c_str());
+  cout  << rev_dns  << endl;
   return 0;
 }
